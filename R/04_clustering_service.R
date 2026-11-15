@@ -49,6 +49,20 @@ cluster_profile <- function(assign_df, cluster_col) {
     )
 }
 
+#' Choose the number of clusters.
+#' If `k_override` is set in config.R, it is used (after validation).
+#' Otherwise the k with the highest average silhouette in `k_range` is used.
+resolve_k <- function(k_override, k_range, avg_silhouette) {
+  if (!is.null(k_override)) {
+    if (!is.numeric(k_override) || length(k_override) != 1 ||
+        k_override < 2 || k_override != round(k_override)) {
+      stop("k_override must be a single whole number >= 2 (or NULL).", call. = FALSE)
+    }
+    return(as.integer(k_override))
+  }
+  k_range[which.max(avg_silhouette)]
+}
+
 run_clustering_service <- function(rfm_features, rfm_raw, cfg = CONFIG) {
   set.seed(cfg$seed)
   n <- nrow(rfm_features)
@@ -77,8 +91,8 @@ run_clustering_service <- function(rfm_features, rfm_raw, cfg = CONFIG) {
     mean(cluster::silhouette(cl, d)[, "sil_width"])
   }, numeric(1))
 
-  k_opt <- cfg$k_range[which.max(sil_km)]
-  km    <- stats::kmeans(x, centers = k_opt, nstart = cfg$nstart)  # retrain at optimal k
+  k_opt <- resolve_k(cfg$k_override, cfg$k_range, sil_km)
+  km    <- stats::kmeans(x, centers = k_opt, nstart = cfg$nstart)  # retrain at chosen k
 
   sil_plot <- ggplot2::ggplot(
     tibble::tibble(k = cfg$k_range, avg_silhouette = sil_km),
@@ -99,7 +113,7 @@ run_clustering_service <- function(rfm_features, rfm_raw, cfg = CONFIG) {
     mean(cluster::silhouette(stats::cutree(hc, k), d)[, "sil_width"])
   }, numeric(1))
 
-  k_hc  <- cfg$k_range[which.max(sil_hc)]
+  k_hc  <- resolve_k(cfg$k_override, cfg$k_range, sil_hc)
   hc_cl <- stats::cutree(hc, k = k_hc)
 
   dend_plot <- factoextra::fviz_dend(
@@ -113,6 +127,9 @@ run_clustering_service <- function(rfm_features, rfm_raw, cfg = CONFIG) {
                   hclust_cluster = factor(hc_cl))
 
   list(
+    idx                = idx,
+    x                  = x,
+    dist               = d,
     k_initial          = cfg$k_initial,
     km_initial         = km_initial,
     k_optimal_kmeans   = k_opt,

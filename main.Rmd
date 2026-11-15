@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
                       fig.width = 9, fig.height = 5.5)
 ```
 
-This report is the integration layer. All logic lives in the services under `R/`; this document only orchestrates them, displays the results and records the interpretation. Render from the project root with `rmarkdown::render("main.Rmd")`.
+The data-set we will be working with comes from a UK-based non-store online retail company that specializes in unique all-occasion gifts. The company has been experiencing a significant drop in its customer retention rate. Many of its customers, especially wholesalers, have been discontinuing their business with the company. As a result, the company is facing challenges in maintaining its revenue and market share. 
 
 ```{r load}
 source("config.R")
@@ -31,7 +31,9 @@ set.seed(CONFIG$seed)
 
 # 1. Data import and cleaning
 
-Service 1 reads the transactions, removes cancellations, non-product codes and rows without a customer identifier. The dataset already contains `CustomerID`, so no identifier is generated.
+Initially, we will read the transactions from the provided data-set. Also we will remove cancellations, non-product codes and rows without a customer identifier. As the data-set already contains `CustomerID`, it is not generated.
+
+From this process we obtain the following results:
 
 ```{r import}
 imp <- run_import_service(CONFIG$data_path)
@@ -40,7 +42,7 @@ kable(imp$quality_log, caption = "Data quality log")
 
 # 2. Customer-level RFM and churn label
 
-Service 2 computes recency (days since last purchase), frequency (number of invoices), and monetary total, minimum and average order value. Churn is 1 when recency exceeds 90 days.
+After we clean the data, we compute recency (days since last purchase), frequency (number of invoices), and monetary total, minimum and average order value. Churn is 1 when recency exceeds 90 days.
 
 ```{r rfm}
 rfm_svc      <- run_rfm_service(imp$transactions)
@@ -55,6 +57,17 @@ Churn rate in the customer base: **`r round(100 * rfm_svc$churn_rate, 1)`%** (`r
 # 3. Descriptive exploratory analysis
 
 ```{r eda}
+cmp <- run_eda_compare_service(rfm_svc$rfm, rfm_svc$rfm_features)
+
+cmp$plots$hist_before_after
+cmp$plots$density_before_after
+cmp$plots$box_before_after
+cmp$plots$box_by_churn
+kable(cmp$skewness, digits = 2, caption = "Skewness before and after log1p")
+
+save_artifact(cmp$plots$hist_before_after, "eda_hist_before_after.png")
+save_artifact(cmp$plots$box_before_after,  "eda_box_before_after.png")
+
 eda <- run_eda_service(rfm_raw)
 
 kable(eda$stats, digits = 2, caption = "Descriptive statistics (raw scale)")
@@ -106,6 +119,35 @@ save_artifact(clu$plots$scatter_recency_frequency, "clust_scatter_rec_freq.png")
 **Segment interpretation**
 
 *[Analyst commentary: describe each K-means segment using the profile table, covering size, average order value, recency and churn rate. Then state how well the hierarchical solution agrees with it, using the cross-tab.]*
+
+## 4.1 Automatic k vs manual k
+
+The silhouette picks k automatically. Here the same customers are also clustered with a manually chosen k, so the two solutions can be compared directly.
+
+```{r k-comparison}
+K_MANUAL <- 4   # set to the k you want to test
+
+cmp_k <- compare_k_solutions(rfm_features, rfm_raw, k_manual = K_MANUAL, auto = clu)
+
+kable(cmp_k$summary, digits = 3,
+      caption = "Quality of the two K-means solutions")
+cat("Adjusted Rand index between the two solutions:", round(cmp_k$ari, 3), "\n")
+kable(cmp_k$crosstab, caption = "Cross-tab: silhouette solution vs manual solution")
+
+cmp_k$plot
+
+kable(cmp_k$profiles$auto, caption = "Segment profiles: silhouette solution")
+kable(cmp_k$profiles$manual, caption = "Segment profiles: manual solution")
+
+save_artifact(cmp_k$plot, "clust_k_comparison.png")
+save_artifact(cmp_k$summary, "clust_k_comparison_summary.csv")
+```
+
+**Comparison**
+
+*[Analyst commentary: say which solution has the better silhouette and explained variance, whether the extra or fewer segments are worth their added complexity, and what the adjusted Rand index says about how far the two groupings agree. Use the profile tables to name the segments in the solution you choose.]*
+
+
 
 # 5. Churn classification: logistic regression and SVM
 

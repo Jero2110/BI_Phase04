@@ -16,6 +16,7 @@ CONFIG <- list(
   k_range              = 2:10,     # search range for optimal k
   cluster_sample_size  = 3000,     # NULL = all customers (hclust needs an n x n distance matrix)
   nstart               = 25,       # K-means random starts
+  k_override           = NULL,     # NULL = choose k by silhouette; set e.g. 4 to force k
 
   # ---- Classification -------------------------------------------------------
   train_prop           = 0.70,
