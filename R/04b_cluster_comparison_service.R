@@ -65,7 +65,7 @@ compare_k_solutions <- function(rfm_features, rfm_raw, k_manual,
                                         cluster = kmeans_cluster)
   )
 
-  comparison_plot <- ggplot2::ggplot(plot_df,
+  comparison_plot1 <- ggplot2::ggplot(plot_df,
                                      ggplot2::aes(frequency, monetary_total, colour = cluster)) +
     ggplot2::geom_point(alpha = 0.5, size = 1.2) +
     ggplot2::facet_wrap(~solution) +
@@ -76,13 +76,25 @@ compare_k_solutions <- function(rfm_features, rfm_raw, k_manual,
                   colour = "Cluster") +
     ggplot2::theme_minimal()
 
+  comparison_plot2 <- ggplot2::ggplot(plot_df,
+                                      ggplot2::aes(frequency, recency, colour = cluster)) +
+    ggplot2::geom_point(alpha = 0.5, size = 1.2) +
+    ggplot2::facet_wrap(~solution) +
+    ggplot2::scale_x_log10() +
+    ggplot2::scale_y_log10() +
+    ggplot2::labs(title = "K-means: automatic k vs manual k",
+                  x = "Frequency (log scale)", y = "Total spend (log scale)",
+                  colour = "Cluster") +
+    ggplot2::theme_minimal()
+  
   list(
-    summary   = summary_tbl,
-    crosstab  = table(Silhouette = auto$kmeans$cluster, Manual = manual$kmeans$cluster),
-    ari       = adjusted_rand(auto$kmeans$cluster, manual$kmeans$cluster),
-    profiles  = list(auto = auto$profiles$kmeans, manual = manual$profiles$kmeans),
-    plot      = comparison_plot,
-    auto      = auto,
-    manual    = manual
+    summary    = summary_tbl,
+    crosstab   = table(Silhouette = auto$kmeans$cluster, Manual = manual$kmeans$cluster),
+    ari        = adjusted_rand(auto$kmeans$cluster, manual$kmeans$cluster),
+    profiles   = list(auto = auto$profiles$kmeans, manual = manual$profiles$kmeans),
+    plot1      = comparison_plot1,
+    plot2      = comparison_plot2,
+    auto       = auto,
+    manual     = manual
   )
 }

@@ -1,5 +1,7 @@
 ---
 title: "Customer Retention & Churn Analysis — UK Online Retail"
+subtitle: "Problem Based Learning - Business Intelligence Course"
+author: "Jeronimo Ramos Ruiz"
 date: "`r format(Sys.Date(), '%d %B %Y')`"
 output:
   html_document:
@@ -15,7 +17,17 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
                       fig.width = 9, fig.height = 5.5)
 ```
 
-The data-set we will be working with comes from a UK-based non-store online retail company that specializes in unique all-occasion gifts. The company has been experiencing a significant drop in its customer retention rate. Many of its customers, especially wholesalers, have been discontinuing their business with the company. As a result, the company is facing challenges in maintaining its revenue and market share. 
+# Introduction
+
+The dataset we will be working with comes from a UK-based non-store online retail company that specializes in unique all-occasion gifts. The company has been experiencing a significant drop in its customer retention rate. Many of its customers, especially wholesalers, have been discontinuing their business with the company. As a result, the company is facing challenges in maintaining its revenue and market share. 
+
+In this report we will analyze the transnational dataset, which contains all the transactions from 01/12/2010 to 09/12/2011, to build a predictive model for customer churn. The objective is to identify the factors that contribute to customer churn and develop a model that can predict which customers are most likely to discontinue their business with the company soon. This predictive model will enable the company to implement proactive retention strategies and improve its customer retention rate. 
+
+The analysis will consider various features such as transaction history, customer demographics, and purchasing behavior to develop an effective churn prediction model. Additionally, we will evaluate the model's performance and provide actionable insights to the company's management on how to reduce customer churn and enhance customer satisfaction.
+
+# Objective
+
+To build predictive models, such as regression and classification, to evaluate their performance using metrics and cross-validation, and support decision-making through data visualization and statistical analysis in R.
 
 ```{r load}
 source("config.R")
@@ -31,9 +43,13 @@ set.seed(CONFIG$seed)
 
 # 1. Data import and cleaning
 
-Initially, we will read the transactions from the provided data-set. Also we will remove cancellations, non-product codes and rows without a customer identifier. As the data-set already contains `CustomerID`, it is not generated.
+The dataset we will be working with comes from a UK-based non-store online retail company that specializes in unique all-occasion gifts. The company has been experiencing a significant drop in its customer retention rate. Many of its customers, especially wholesalers, have been discontinuing their business with the company. As a result, the company is facing challenges in maintaining its revenue and market share. 
 
-From this process we obtain the following results:
+In this report we will analyze the transnational dataset, which contains all the transactions from `r range(imp$transactions$invoice_date, na.rm = TRUE)[1]` to `r range(imp$transactions$invoice_date, na.rm = TRUE)[2]`, to build a predictive model for customer churn. To achieve this, we will use R as the primary analysis tool.
+
+The dataset used contains information for each invoice, including the product code, its corresponding description, the quantity purchased, the unit price, and the date of purchase. Additionally, it includes two fields for the customer identifier and the country of origin.
+
+In total, there are more than 500,000 records. However, before loading the data for analysis, a cleaning and preparation process was carried out. It involved removing product codes related to cancellations, discounts, taxes, bank commissions, or shipping costs. Additionally, invoice cancellations were removed, as well as missing values in the customer and invoice identifier columns and in the date field. Following this cleaning process, approximately 390,000 records remain (around 27.8% of data were dropped), corresponding to 4,334 unique customers.
 
 ```{r import}
 imp <- run_import_service(CONFIG$data_path)
@@ -42,7 +58,7 @@ kable(imp$quality_log, caption = "Data quality log")
 
 # 2. Customer-level RFM and churn label
 
-After we clean the data, we compute recency (days since last purchase), frequency (number of invoices), and monetary total, minimum and average order value. Churn is 1 when recency exceeds 90 days.
+To identify the behavior of registered customers, the data were grouped by customer. For each customer, the following metrics were calculated: recency (the number of days since their last purchase), the total number of transactions, and a summary of their purchases—including the total value spent, as well as the minimum and average purchase amounts. Additionally, a binary variable was included to identify customers who have become inactive, based on the time elapsed since their last purchase: a value of 1 is assigned if the customer hasn't made a purchase within the last 90 days, and 0 otherwise. As shown below:
 
 ```{r rfm}
 rfm_svc      <- run_rfm_service(imp$transactions)
@@ -52,46 +68,79 @@ rfm_features <- rfm_svc$rfm_features
 kable(head(rfm_raw, 10), digits = 2, caption = "First customers (raw RFM values)")
 ```
 
-Churn rate in the customer base: **`r round(100 * rfm_svc$churn_rate, 1)`%** (`r sum(rfm_raw$churn)` of `r nrow(rfm_raw)` customers).
+
+Thanks to the field created to identify customer churn, we can calculate a churn rate of **`r round(100 * rfm_svc$churn_rate, 1)`%** (`r sum(rfm_raw$churn)` of `r nrow(rfm_raw)` customers), which indicates that 3 out of every 10 customers have stopped purchasing products from the company.
 
 # 3. Descriptive exploratory analysis
 
-```{r eda}
-cmp <- run_eda_compare_service(rfm_svc$rfm, rfm_svc$rfm_features)
+Initially, a descriptive analysis of the variables of interest related to customers was conducted. This analysis reveals that, on average, customers make a purchase every 93 days, with a maximum interval of approximately one year between purchases. This suggests that, in general, customers remain active. Furthermore, it is observed that, on average, customers made 4 purchases during the analyzed period. It is worth noting that some customers made as many as 206 purchases. Additionally, the average sales figure is 2,015.97.
 
-cmp$plots$hist_before_after
-cmp$plots$density_before_after
-cmp$plots$box_before_after
-cmp$plots$box_by_churn
-kable(cmp$skewness, digits = 2, caption = "Skewness before and after log1p")
-
-save_artifact(cmp$plots$hist_before_after, "eda_hist_before_after.png")
-save_artifact(cmp$plots$box_before_after,  "eda_box_before_after.png")
-
-eda <- run_eda_service(rfm_raw)
+```{r eda_stats}
+eda <- run_eda_service(rfm_raw, rfm_features)
 
 kable(eda$stats, digits = 2, caption = "Descriptive statistics (raw scale)")
-eda$plots$histograms
-eda$plots$densities
-eda$plots$churn_bar
-eda$plots$frequency_bar
-kable(eda$outliers, digits = 1, caption = "Outliers by the 1.5 x IQR rule")
 
-save_artifact(eda$plots$histograms, "eda_histograms.png")
-save_artifact(eda$plots$densities,  "eda_densities.png")
-save_artifact(eda$plots$churn_bar,  "eda_churn_bar.png")
-save_artifact(eda$plots$frequency_bar, "eda_frequency_bar.png")
 ```
 
-**Key findings**
+When attempting to represent the data in a histogram, it was observed that the data exhibit a positive skew, which makes it difficult to clearly distinguish the underlying patterns, as shown below:
 
-- The churn rate is **`r round(100 * eda$churn_rate, 1)`%**.
-- Every monetary and frequency variable is strongly right-skewed. The mean is pulled well above the median, which is why the log1p transform is applied before clustering and modelling.
-- Outliers are concentrated in the upper tail of frequency and spend (`r max(eda$outliers$outlier_pct)`% at most for any variable). These are most likely wholesale accounts. They are kept because they are real business customers, but they dominate the variance and are a reason to use log scales.
+```{r eda_plots}
+eda <- run_eda_service(rfm_raw, rfm_features)
+
+eda$plots$histograms
+eda$plots$densities
+eda$plots$box
+
+save_artifact(eda$plots$histograms, "eda_histograms_raw.png")
+save_artifact(eda$plots$densities,  "eda_densities_raw.png")
+```
+
+Consequently, a logarithmic transformation was applied using the `log1p()` function; this approach compresses very large values and expands smaller ones, helping the skewed distribution more closely approximate a normal distribution.
+
+As can be seen, the logarithmic transformation brings Fisher’s skewness coefficient closer to 0, resulting in more symmetric data. It is worth noting that this is the dataset used to train the models; this step ensures that the models are not biased by the underlying data distribution or unduly influenced by outliers. Even so, a trend is evident: customers tend to have a low purchase frequency, with values close to zero. Meanwhile, the "recency" metric shows that the majority of data points fall within 100 days of the last purchase—a finding that confirms our earlier observation that most customers remain active.
+
+```{r eda_log1p}
+eda <- run_eda_service(rfm_raw, rfm_features, TRUE)
+
+eda$plots$histograms
+eda$plots$densities
+
+kable(eda$skewness, digits = 2, caption = "Skewness before and after log1p")
+
+save_artifact(eda$plots$histograms, "eda_histograms_log1p.png")
+save_artifact(eda$plots$densities,  "eda_densities_log1p.png")
+```
+
+The following charts show the relationship between active and inactive (or churned) customers it is evident that the majority of customers have made purchases within the last 90 days. It should be noted that this includes both new customers and existing customers who have purchased recently. The chart showing the number of orders or purchases indicates that the largest segment of active customers consists of new customers who have bought recently, rather than repeat customers (those who have made subsequent purchases).
+
+```{r eda_churn}
+eda$plots$churn_bar
+eda$plots$frequency_bar
+
+save_artifact(eda$plots$churn_bar,  "eda_churn_bar.png")
+save_artifact(eda$plots$frequency_bar, "eda_frequency_bar.png")
+
+```
+
+On the other hand, it can be observed that outliers are concentrated at the upper end of the frequency and expenditure distributions (reaching a maximum of `r max(eda$outliers$outlier_pct)`% for any given variable). These are very likely wholesale accounts. They are retained because they represent genuine commercial clients; however, as they dominate the variance, they provide an additional reason for using logarithmic scales.
+
+As can be seen in the following boxplots—broken down by active and inactive customers—the behavior of the variables under study is evident. Of particular note is the behavior of the frequency variable: the data for active customers suggest a higher proportion of repeat customers compared to new customers—contrary to what had previously been speculated.
+
+```{r eda_outliers}
+eda$plots$box
+eda$plots$box_by_churn
+
+kable(eda$outliers, digits = 1, caption = "Outliers by the 1.5 x IQR rule")
+
+save_artifact(eda$plots$box, "eda_box_log1p.png")
+save_artifact(eda$plots$box_by_churn,  "eda_box_by_churn.png")
+```
 
 # 4. Clustering: K-means and hierarchical
 
-Service 4 standardises the five RFM variables with `scale()`, runs K-means with the initial k = 3, selects the optimal k using the elbow method and the average silhouette width, and retrains. Hierarchical clustering uses Ward.D2 on the same distance matrix.
+To standardize the variables of interest (mean of 0 and standard deviation of 1), the `scale()` function is used. This ensures that clustering algorithms based on mathematical distances (such as Euclidean distance) are not disproportionately influenced by certain variables simply due to the magnitude of their values.
+
+Initially, the K-means algorithm is executed with an initial value of $k = 4$, and this is compared against the determination of the optimal $k$ value using the elbow method and the average silhouette width. Additionally, hierarchical clustering is performed using Ward’s method (Ward.D2) on the same distance matrix to evaluate the optimal value of $k$, as shown below:
 
 ```{r clustering}
 clu <- run_clustering_service(rfm_features, rfm_raw)
@@ -116,16 +165,18 @@ save_artifact(clu$plots$scatter_frequency_spend, "clust_scatter_freq_spend.png")
 save_artifact(clu$plots$scatter_recency_frequency, "clust_scatter_rec_freq.png")
 ```
 
-**Segment interpretation**
+As can be seen, although the elbow method did not show an abrupt change as the value of $k$ increased—which would have helped determine the optimal value—the higher silhouette score indicates that the optimal number of clusters ($k$) is 2. Similarly, the hierarchical clustering, as represented in the dendrogram, also suggests that the optimal number of clusters is 2. This is to be expected, given that the ultimate goal of the model is to distinguish active customers from those who have stopped making purchases.
 
-*[Analyst commentary: describe each K-means segment using the profile table, covering size, average order value, recency and churn rate. Then state how well the hierarchical solution agrees with it, using the cross-tab.]*
+In both cases, the groups are representative and divide the dataset into approximately 40% (Group 1) and 60% (Group 2). When examining the customer churn rate, we can observe that the actual churn rate is significantly lower in Group 1 (5.1% for k-means, 8.1% for hierarchical clustering) compared to Group 2 (50.3% for k-means, 52.2% for hierarchical clustering). These results suggest a segmentation that effectively separates the data into a group of active customers and a group of inactive ones. Furthermore, we can identify specific characteristics that define these groups. For instance, Group 1 appears to consist of wholesale or high-volume customers, with an average of 5 to 6 recorded purchases and an average transaction value between 4,000 and 4,500. In contrast, Group 2 corresponds to customers who made a single purchase and did not return.
 
-## 4.1 Automatic k vs manual k
+In addition to the above, the scatter plots show that Group 1 consists of customers with higher purchase volumes and greater purchase frequency—in other words, customers who are loyal to the company—whereas Group 2 is composed primarily of customers who have made only a single purchase. Furthermore, it is evident that the model does not categorize new customers (defined as those who have made a single purchase within the last 90 days) as "loyal customers," which indicates that, given the current number of defined groups, the model fails to identify potential loyal customers.
 
-The silhouette picks k automatically. Here the same customers are also clustered with a manually chosen k, so the two solutions can be compared directly.
+## 4.1 Optimal k vs other k
+
+On the other hand, comparing the number of clusters determined by the silhouette methodology with the clusters defined manually (k=4) yields the following information.
 
 ```{r k-comparison}
-K_MANUAL <- 4   # set to the k you want to test
+K_MANUAL <- 3
 
 cmp_k <- compare_k_solutions(rfm_features, rfm_raw, k_manual = K_MANUAL, auto = clu)
 
@@ -143,15 +194,16 @@ save_artifact(cmp_k$plot, "clust_k_comparison.png")
 save_artifact(cmp_k$summary, "clust_k_comparison_summary.csv")
 ```
 
-**Comparison**
+Although the average silhouette value is lower for k=4, this number of clusters increases the explained variance—rising from 32.82 to 56.27—which indicates that the data are better captured by a division into 4 clusters. Furthermore, the smallest cluster accounts for 12.4% of the data, suggesting that this segmentation does not merely identify outliers that would fail to add value to the analysis.
 
-*[Analyst commentary: say which solution has the better silhouette and explained variance, whether the extra or fewer segments are worth their added complexity, and what the adjusted Rand index says about how far the two groupings agree. Use the profile tables to name the segments in the solution you choose.]*
+By segmenting the data into four groups, we can identify a more clearly defined market and propose better marketing strategies for each of these segments. For instance, there are two groups with low churn rates, distinguished by their purchase volume and the total value of their acquisitions. These two groups could represent loyal wholesale customers (frequency > 11; average purchase value > 9,000) and retail customers (frequency > 4; average purchase value > 1,700). Conversely, there are two other groups in which approximately half of the customers tend to churn. These groups may represent large-scale and small-scale potential customers—differentiated by the quantity of products purchased—who appear to have made only a single purchase and did not return.
 
+From this, we can see that it is possible to implement loyalty campaigns designed to convert potential customers into loyal ones, while also identifying the factors that lead existing loyal customers to continue choosing the brand.
 
 
 # 5. Churn classification: logistic regression and SVM
 
-Service 5 splits the data 70/30 with stratification on the churn label, so both sets keep the same churn ratio. Recency is excluded from the predictors because it defines the label (see the leakage note in the service file).
+For this exercise, the data are split in a 70/30 ratio, applying stratification based on the churn label so that both sets maintain the same churn rate. The "recency" variable is excluded from the predictors because it defines the label we aim to identify using the applied supervised model.
 
 ```{r classification}
 clf <- run_classification_service(rfm_features)
@@ -165,13 +217,15 @@ kable(clf$metrics, digits = 3, caption = "Test-set performance, baseline models"
 cat("Best balance between false positives and false negatives:", clf$best, "\n")
 ```
 
-**Interpretation**
+Given that the objective is to correctly identify customers who churn, Logistic Regression is the better choice of the two models, despite having a slightly lower overall accuracy.
 
-*[Analyst commentary: compare the false positive and false negative counts of the two models. Explain which one better balances the two error types and why this matters for retention, since a false negative is a churner who goes unnoticed and a false positive is a loyal customer who receives an unnecessary retention offer.]*
+In this context, the critical metric is Recall (Sensitivity), as it captures a higher number of churning customers. In this regard, Logistic Regression outperforms the SVM model by nearly 6 percentage points (54.0% versus 48.1%). Specifically, out of a total of 437 customers who actually churned (TP + FN), Logistic Regression successfully identifies 236 (TP) but misses 201 (FN). Meanwhile, the SVM model fails to detect 227 customers. In this case study, losing a customer who intends to leave is generally far more costly than sending a proactive promotion to someone who had no intention of leaving (FP).
+
+Nevertheless, based on the initial results, both models are failing to identify nearly half of the customers at risk of churning.
 
 # 6. 10-fold cross-validation
 
-Service 6 runs 10-fold cross-validation for both models and extracts accuracy, recall and F1 for every fold with `resamples()`.
+To assess the stability and reliability of the implemented models, a 10-iteration cross-validation is performed for both models, and the accuracy, recall, and F1-score for each iteration are extracted using `resamples()`.
 
 ```{r cv}
 cvs <- run_cv_service(clf$split$train)
@@ -183,13 +237,17 @@ bwplot_obj <- lattice::bwplot(cvs$resamples, metric = c("Accuracy", "Recall", "F
 print(bwplot_obj)
 ```
 
-**Stability**
+In general, the standard deviations (SD) of Logistic Regression are lower across all three metrics. In the boxplots, the boxes and whiskers of SVM are wider (especially for Recall, which ranges from 0.45 to 0.58), indicating that the SVM model is more sensitive to how the data is divided.
 
-*[Analyst commentary: say whether the metrics vary substantially across folds (look at the SD values and the box plots), and which model is more consistent.]*
+Additionally, the boxplot for Logistic Regression's Recall is noticeably shifted to the right (around 0.58), while SVM's lags behind (around 0.52). Even the worst-performing Logistic Regression (left whisker at ~0.53) surpasses the median of SVM.
+
+Similarly, the boxplot for Logistic Regression's F1-Score is very narrow (SD = 0.020), with almost all its results concentrated around 0.58. Although it has an isolated outlier (the point on the left near 0.53), its overall performance is still above the bulk of SVM's results.
+
+It is concluded that Logistic Regression is the most suitable, stable, and reliable of the two models for predicting customer churn. When evaluating multiple data partitions, Logistic Regression not only achieves a higher average across key metrics but also demonstrates less dispersion in its results.
 
 # 7. Hyperparameter tuning and final evaluation
 
-Service 7 tunes glmnet (alpha and lambda) and the radial SVM (sigma and C) with 5-fold CV repeated 3 times, selecting on F1. The tuned models are then evaluated on the same test set used in Section 5.
+To optimize the parameters of both models, although the logistic regression showed better performance, the hyperparameters of the logistic regression (alpha and lambda) and the radial SVM (sigma and C) were adjusted using glmnet with 5-fold cross-validation repeated three times, using the F1 metric for selection. The results of the adjusted models, evaluated on the same test set used previously, are presented below.
 
 ```{r tuning, cache = TRUE}
 tun <- run_tuning_service(clf$split$train, clf$split$test, baseline_metrics = clf$metrics)
@@ -206,22 +264,7 @@ plot(tun$fits$svm)
 plot(tun$fits$logistic)
 ```
 
-**Reflection and recommendation**
 
-Tuned models achieve the following F1 on the test set: logistic regression **`r round(tun$tuned_metrics$f1[1], 3)`** and radial SVM **`r round(tun$tuned_metrics$f1[2], 3)`**. The recommended model for deployment, based on test F1, is **`r tun$recommendation`**.
-
-*[Analyst commentary: judge whether tuning produced a real gain, or whether the gain is within the fold-to-fold variation seen in Section 6. Then give the deployment recommendation and its main caveat.]*
-
-# 8. Summary
-
-| Stage | Output |
-|---|---|
-| Customers analysed | `r nrow(rfm_raw)` |
-| Churn rate | `r round(100 * rfm_svc$churn_rate, 1)`% |
-| Optimal k (K-means / hierarchical) | `r clu$k_optimal_kmeans` / `r clu$k_optimal_hclust` |
-| Best baseline model (test) | `r clf$best` |
-| Most stable model (CV) | `r cvs$stability` |
-| Recommended model (tuned) | `r tun$recommendation` |
 
 ```{r save-results}
 save_artifact(clf$metrics, "classification_baseline_metrics.csv")

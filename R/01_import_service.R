@@ -13,7 +13,7 @@ NON_PRODUCT_CODES <- c("POST", "D", "M", "BANK CHARGES", "PADS", "DOT",
 
 parse_invoice_date <- function(x) {
   if (inherits(x, "POSIXt")) return(x)
-  lubridate::parse_date_time(x, orders = c("mdy HM", "mdy HMS", "ymd HMS"), tz = "UTC")
+  lubridate::parse_date_time(x, orders = c("mdy HM", "mdy HMS"), tz = "UTC")
 }
 
 import_transactions <- function(path) {

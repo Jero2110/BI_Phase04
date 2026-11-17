@@ -37,7 +37,7 @@ run_tuning_service <- function(train, test, baseline_metrics, cfg = CONFIG) {
     method = "repeatedcv",
     number = cfg$tune_folds,
     repeats = cfg$tune_repeats,
-    classProbs = FALSE,
+    classProbs = TRUE,
     summaryFunction = f1_summary
   )
 

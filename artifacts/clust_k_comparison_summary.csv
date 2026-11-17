@@ -1,0 +1,3 @@
+solution,k,avg_silhouette,explained_variance_pct,smallest_segment_pct
+Silhouette (k=2),2,0.3197909833311723,32.81743082377026,36.63333333333333
+Manual (k=3),3,0.27978814458075857,49.10160346214986,28
