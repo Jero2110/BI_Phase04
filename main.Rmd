@@ -43,6 +43,10 @@ set.seed(CONFIG$seed)
 
 # 1. Data import and cleaning
 
+```{r import}
+imp <- run_import_service(CONFIG$data_path)
+```
+
 The dataset we will be working with comes from a UK-based non-store online retail company that specializes in unique all-occasion gifts. The company has been experiencing a significant drop in its customer retention rate. Many of its customers, especially wholesalers, have been discontinuing their business with the company. As a result, the company is facing challenges in maintaining its revenue and market share. 
 
 In this report we will analyze the transnational dataset, which contains all the transactions from `r range(imp$transactions$invoice_date, na.rm = TRUE)[1]` to `r range(imp$transactions$invoice_date, na.rm = TRUE)[2]`, to build a predictive model for customer churn. To achieve this, we will use R as the primary analysis tool.
@@ -51,8 +55,7 @@ The dataset used contains information for each invoice, including the product co
 
 In total, there are more than 500,000 records. However, before loading the data for analysis, a cleaning and preparation process was carried out. It involved removing product codes related to cancellations, discounts, taxes, bank commissions, or shipping costs. Additionally, invoice cancellations were removed, as well as missing values in the customer and invoice identifier columns and in the date field. Following this cleaning process, approximately 390,000 records remain (around 27.8% of data were dropped), corresponding to 4,334 unique customers.
 
-```{r import}
-imp <- run_import_service(CONFIG$data_path)
+```{r quality_log}
 kable(imp$quality_log, caption = "Data quality log")
 ```
 
@@ -264,7 +267,11 @@ plot(tun$fits$svm)
 plot(tun$fits$logistic)
 ```
 
+The graphs show that both models collapsed into a trivial classifier (predicting the same class for all customers) and that optimization based on the F1-score is rewarding this lack of discrimination. A flat horizontal line at approximately 0.98885 is visible in the graphs; this does not represent high performance, but rather the F1-score obtained when 100% of the data is predicted as positive in a scenario where one class constitutes the majority of the sample.
 
+For the SVM model, at low cost values (Cost = 0.25, 0.5, 1), the lines remain completely flat at 0.98885 across all Sigma values. This indicates that the model fails to separate the classes. Conversely, when the penalty is increased (Cost = 4 and 8), the SVM model is compelled to account for the minority class, leading it to classify some customers as "negative." In making actual predictions, the model incurs some errors, causing the F1 score to drop slightly (to 0.9882). Since the `caret` package aims to maximize the F1 score, it discards the models that actually attempt to perform classification (Cost = 4, 8) and selects Cost = 0.25, because "doing nothing" yields a higher F1 score.
+
+On the other hand, in the case of logistic regression, for any regularization parameter (\(\lambda\)) greater than 0.02, the penalty drives all coefficients to zero, and the model collapses into the exact same flat line (0.98885). Furthermore, as \(\lambda\) approaches 0 (0.00599), the model incorporates the variables and achieves a marginal increase of +0.0003 in the F1 score (0.98915); however, this remains insufficient to cross the decision threshold on the test set.
 
 ```{r save-results}
 save_artifact(clf$metrics, "classification_baseline_metrics.csv")
